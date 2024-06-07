@@ -111,7 +111,11 @@ let load = (name = 'save') => {
 
 // export current game to disk (optionally accepts a filename)
 let exportSave = (name) => {
-  const filename = `${name.length ? name : 'text-engine-save'}.txt`;
+  const defaultName = 'text-engine-save'
+  if(!name) {
+    name = defaultName
+  }
+  const filename = `${name}.txt`;
   saveFile(JSON.stringify(inputs), filename);
   println(`Game exported to "${filename}".`);
 };
@@ -209,7 +213,7 @@ let inv = () => {
 };
 
 // show room description
-let look = () => {
+let describeRoom = () => {
   const room = getRoom(disk.roomId);
 
   if (typeof room.onLook === 'function') {
@@ -263,8 +267,31 @@ let lookAt = (args) => {
   }
 };
 
+let look = (args) => {
+  args = filterArticles(args)
+  if(!args.length) {
+    // "look"
+    describeRoom()
+  } else if (args.length === 1) {
+    // "look around"
+    lookThusly(args[0])
+  } else {
+    // "look at key", "talk to mary"
+    // ignore preposition e.g. at, to when building item name
+    const itemName = args.slice(1).join(' ')
+    lookAt([args[0], itemName])
+  }
+}
+let listOrGoDir = (args) => {
+  dir = filterArticles(args).join(' ')
+  if(!dir.length) {
+    listExits()
+  } else {
+    goDir(dir)
+  }
+}
 // list available exits
-let go = () => {
+let listExits = () => {
   const room = getRoom(disk.roomId);
   const exits = room.exits.filter(exit => !exit.isHidden);
 
@@ -343,20 +370,16 @@ let goDir = (dir) => {
   enterRoom(nextRoom.id);
 };
 
-// shortcuts for cardinal directions
-// (allows player to type just e.g. 'n')
-let n = () => goDir('north');
-let s = () => goDir('south');
-let e = () => goDir('east');
-let w = () => goDir('west');
-let ne = () => goDir('northeast');
-let se = () => goDir('southeast');
-let nw = () => goDir('northwest');
-let sw = () => goDir('southwest');
-
+let talk = (args) => {
+  if(!args.length) {
+    listOrtalkToOnlyChar()
+  } else {
+    talkToOrAboutX(args[0], args[1])
+  }
+}
 // if there is one character in the room, engage that character in conversation
 // otherwise, list characters in the room
-let talk = () => {
+let listOrtalkToOnlyChar = () => {
   const characters = getCharactersInRoom(disk.roomId);
 
   // assume players wants to talk to the only character in the room
@@ -367,7 +390,7 @@ let talk = () => {
 
   // list characters in the room
   println(`You can talk TO someone or ABOUT some topic.`);
-  chars();
+  listCharacters();
 };
 
 // speak to someone or about some topic
@@ -498,7 +521,7 @@ let talkToOrAboutX = (preposition, x) => {
 };
 
 // list takeable items in room
-let take = () => {
+let listTakeables = () => {
   const room = getRoom(disk.roomId);
   const items = (room.items || []).filter(item => item.isTakeable && !item.isHidden);
 
@@ -511,6 +534,14 @@ let take = () => {
   items.forEach(item => println(`${bullet} ${getName(item.name)}`));
 };
 
+let listOrTakeItem = (args) => {
+  args = filterArticles(args)
+  if(!args.length) {
+    listTakeables()
+  } else {
+    takeItem(args.join(' '))
+  }
+}
 // take the item with the given name
 // string -> nothing
 let takeItem = (itemName) => {
@@ -546,8 +577,17 @@ let takeItem = (itemName) => {
   }
 };
 
+let listOrUseItem = (args) => {
+  args = filterArticles(args)
+  if(!args.length) {
+    listUseables()
+  } else {
+    useItem(args.join(' '))
+  }
+}
+
 // list useable items in room and inventory
-let use = () => {
+let listUseables = () => {
   const room = getRoom(disk.roomId);
 
   const useableItems = (room.items || [])
@@ -596,7 +636,7 @@ let useItem = (itemName) => {
 };
 
 // list items in room
-let items = () => {
+let listItems = () => {
   const room = getRoom(disk.roomId);
   const items = (room.items || []).filter(item => !item.isHidden);
 
@@ -611,7 +651,7 @@ let items = () => {
 }
 
 // list characters in room
-let chars = () => {
+let listCharacters = () => {
   const room = getRoom(disk.roomId);
   const chars = getCharactersInRoom(room.id).filter(char => !char.isHidden)
 
@@ -644,7 +684,7 @@ let help = () => {
 };
 
 // handle say command with no args
-let say = () => println([`Say what?`, `You don't say.`]);
+let sayNothing = () => println([`Say what?`, `You don't say.`]);
 
 // say the passed string
 // string -> nothing
@@ -654,73 +694,56 @@ let sayString = (str) => println(`You say ${removePunctuation(str)}.`);
 // nothing -> string
 let getInput = () => input.value.trim();
 
-// objects with methods for handling commands
-// the array should be ordered by increasing number of accepted parameters
-// e.g. index 0 means no parameters ("help"), index 1 means 1 parameter ("go north"), etc.
-// the methods should be named after the command (the first argument, e.g. "help" or "go")
-// any command accepting multiple parameters should take in a single array of parameters
-// if the user has entered more arguments than the highest number you've defined here, we'll use the last set
-let commands = [
-  // no arguments (e.g. "help", "chars", "inv")
-  {
-    inv,
-    i: inv, // shortcut for inventory
-    inventory: inv,
-    look,
-    l: look, // shortcut for look
-    go,
-    n,
-    s,
-    e,
-    w,
-    ne,
-    se,
-    sw,
-    nw,
-    talk,
-    t: talk, // shortcut for talk
-    take,
-    get: take,
-    items,
-    use,
-    chars,
-    characters: chars,
-    help,
-    say,
-    save,
-    load,
-    restore: load,
-    export: exportSave,
-    import: importSave,
-  },
-  // one argument (e.g. "go north", "take book")
-  {
-    look: lookThusly,
-    go: goDir,
-    take: takeItem,
-    get: takeItem,
-    use: useItem,
-    say: sayString,
-    save: x => save(x),
-    load: x => load(x),
-    restore: x => load(x),
-    x: x => lookAt([null, x]), // IF standard shortcut for look at
-    t: x => talkToOrAboutX('to', x), // IF standard shortcut for talk
-    export: exportSave,
-    import: importSave, // (ignores the argument)
-  },
-  // two+ arguments (e.g. "look at key", "talk to mary")
-  {
-    look: lookAt,
-    say(args) {
-      const str = args.reduce((cur, acc) => cur + ' ' + acc, '');
-      sayString(str);
-    },
-    talk: args => talkToOrAboutX(args[0], args[1]),
-    x: args => lookAt([null, ...args]),
-  },
-];
+let commands = {
+  // 0 arg commands
+  inv,
+  i: inv,
+  inventory: inv,
+  l: describeRoom,
+  // directions
+  north: () => goDir('north'),
+  east: () => goDir('east'),
+  south: () => goDir('south'),
+  west: () => goDir('west'),
+  northeast: () => goDir('northeast'),
+  southeast: () => goDir('southeast'),
+  northwest: () => goDir('northwest'),
+  southwest: () => goDir('southwest'),
+  // shorthand directions
+  n: () => goDir('north'),
+  e: () => goDir('east'),
+  s: () => goDir('south'),
+  w: () => goDir('west'),
+  ne: () => goDir('northeast'),
+  se: () => goDir('southeast'),
+  nw: () => goDir('northwest'),
+  sw: () => goDir('southwest'),
+  chars: listCharacters,
+  characters: listCharacters,
+  help,
+  // 0-n arg commands
+  look,
+  go: listOrGoDir,
+  take: listOrTakeItem,
+  get: listOrTakeItem,
+  items: listItems,
+  use: listOrUseItem,
+  say: (args) => args.length ? sayString(args.join(' ')) : sayNothing,
+  talk,
+  t: talk,
+  save: ([name]) => save(name),
+  load: ([name]) => load(name),
+  restore: ([name]) => load(name),
+  x: (args) => lookAt([null, args.join(' ')]), // IF standard shortcut for look at
+  t: (args) => talkToOrAboutX('to', args.join(' ')), // IF standard shortcut for talk
+  export: ([name]) => exportSave(name),
+  import: importSave,
+  take: (args) => takeItem(args.join(' ')),
+  use: (args) => useItem(args.join(' ')),
+}
 
+let tokenize = (input) => input.split(/\s+/)
+let filterArticles = (args) => args.filter(arg => arg !== 'a' && arg !== 'an' && arg != 'the')
 // process user input & update game state (bulk of the engine)
 // accepts optional string input; otherwise grabs it from the input element
 let applyInput = (input) => {
@@ -735,50 +758,19 @@ let applyInput = (input) => {
   inputsPos = inputs.length;
   println(`> ${input}`);
 
-  const val = input.toLowerCase();
   setInput(''); // reset input field
 
-  const exec = (cmd, arg) => {
-    if (cmd) {
-      cmd(arg);
-    } else if (disk.conversation) {
-      println(`Type the capitalized KEYWORD to select a topic.`);
-    } else {
-      println(`Sorry, I didn't understand your input. For a list of available commands, type HELP.`);
-    }
-  };
-
-  let values = val.split(' ')
-
-  // remove articles
-  // (except for the say command, which prints back what the user said)
-  // (and except for meta commands to allow save names such as 'a')
-  if (values[0] !== 'say' && isNotSaveLoad(values[0])) {
-    values = values.filter(arg => arg !== 'a' && arg !== 'an' && arg != 'the');
-  }
-
-  const [command, ...args] = values;
-  const room = getRoom(disk.roomId);
-
-  if (args.length === 1) {
-    exec(commands[1][command], args[0]);
-  } else if (command === 'take' && args.length) {
-    // support for taking items with spaces in the names
-    // (just tries to match on the first word)
-    takeItem(args[0]);
-  } else if (command === 'use' && args.length) {
-    // support for using items with spaces in the names
-    // (just tries to match on the first word)
-    useItem(args[0]);
-  } else if (args.length >= commands.length) {
-    exec(commands[commands.length - 1][command], args);
-  } else if (room.exits && getExit(command, room.exits)) {
-    // handle shorthand direction command, e.g. "EAST" instead of "GO EAST"
-    goDir(command);
-  } else if (disk.conversation && (disk.conversation[command] || conversationIncludesTopic(disk.conversation, command))) {
+  const tokens = tokenize(input)
+  const command = tokens.shift()
+  const args = tokens;
+  if(command in commands) {
+    commands[command](args)
+  } else if(disk.conversation && (disk.conversation[command] || conversationIncludesTopic(disk.conversation, command))) {
     talkToOrAboutX('about', command);
+  } else if (disk.conversation) {
+    println(`Type the capitalized KEYWORD to select a topic.`);
   } else {
-    exec(commands[args.length][command], args);
+    println(`Sorry, I didn't understand your input. For a list of available commands, type HELP.`);
   }
 };
 
@@ -865,9 +857,7 @@ let autocomplete = () => {
   if (words.length === 1) {
     // get the list of options from the commands array
     // (exclude one-character commands from auto-completion)
-    const allCommands = commands
-      .reduce((acc, cur) => acc.concat(Object.keys(cur)), [])
-      .filter(cmd => cmd.length > 1);
+    const allCommands = Object.keys(commands).filter(cmd => cmd.length > 1);
 
     options = [...new Set(allCommands)];
     if (disk.conversation) {

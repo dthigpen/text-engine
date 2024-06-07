@@ -264,9 +264,7 @@ If existing commands don't work how you want them to, you can override them by r
 
 For instance, you may wish to implement your own versions of the "save" and "load" commands. Or you may not wish to include `save` or `load` at all.
 
-Commands are stored on a global array called `commands`. Each element in the array is a JavaScript object with methods attached. The index of the element indicates how many arguments it accepts. So, for instance, all methods attached to `commands[0]` take zero arguments.
-
-Methods are named according to what the player types to issue them. For instance, the player can type "go" with no arguments to see available exits in the room. This command is found at `commands[0].go`.
+Commands are stored on a global Object called `commands`. Methods are named according to what the player types to issue them. For instance, the player can type "go" to see available exits in the room. This command is found at `commands.go`.
 
 Here are a few examples of ways to override the default commands:
 
@@ -274,19 +272,20 @@ Here are a few examples of ways to override the default commands:
 // Add a command which takes no arguments.
 // In this example, the command is called "play", and the user would type "play" to use the command.
 const play = () => println(`You’re already playing a game!`);
-commands[0] = Object.assign(commands[0], {play});
+commands = Object.assign(commands, {play});
 
 // Override a command's function.
 // In this example, we're overriding the "save" command.
 save = () => println(`Sorry, saving is not supported in this game.`);
+commands = Object.assign(commands, {save});
 
 // Remove an existing command.
 // In this example, we're removing the "save" command.
-delete commands[0].save;
+delete commands.save;
 
 // Completely replace existing commands.
 // In this example, the only two commands available in the entire game will be "walk" and "talk".
-commands = [{walk: () => println(‘you walk’), talk: () => println(‘you talk’)}];
+commands = {walk: () => println(‘you walk’), talk: () => println(‘you talk’)};
 ```
 
 If you do remove some or all of the default commands, you'll want to override the `help` function as well so that it doesn't list commands which are not supported by your game.

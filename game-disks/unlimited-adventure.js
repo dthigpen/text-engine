@@ -10,7 +10,7 @@ USE [OBJECT NAME] e.g. 'use door'
 INV :: list inventory items
 HELP :: this help menu`);
 
-commands[0].help = help;
+commands.help = help;
 
 // switch to the retro style
 document.getElementById('styles').setAttribute('href', 'styles/retro.css');
