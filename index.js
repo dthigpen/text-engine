@@ -343,6 +343,10 @@ let goDir = (dir) => {
   enterRoom(nextRoom.id);
 };
 
+let north = () => goDir('north');
+let south = () => goDir('south');
+let east = () => goDir('east');
+let west = () => goDir('west');
 // shortcuts for cardinal directions
 // (allows player to type just e.g. 'n')
 let n = () => goDir('north');
@@ -669,6 +673,10 @@ let commands = [
     look,
     l: look, // shortcut for look
     go,
+    north,
+    south,
+    east,
+    west,
     n,
     s,
     e,
@@ -712,6 +720,9 @@ let commands = [
   // two+ arguments (e.g. "look at key", "talk to mary")
   {
     look: lookAt,
+    take: (args) => takeItem(args.join(' ')),
+    get: (args) => takeItem(args.join(' ')),
+    use: (args) => useItem(args.join(' ')),
     say(args) {
       const str = args.reduce((cur, acc) => cur + ' ' + acc, '');
       sayString(str);
@@ -758,23 +769,11 @@ let applyInput = (input) => {
   }
 
   const [command, ...args] = values;
-  const room = getRoom(disk.roomId);
-
+  
   if (args.length === 1) {
     exec(commands[1][command], args[0]);
-  } else if (command === 'take' && args.length) {
-    // support for taking items with spaces in the names
-    // (just tries to match on the first word)
-    takeItem(args[0]);
-  } else if (command === 'use' && args.length) {
-    // support for using items with spaces in the names
-    // (just tries to match on the first word)
-    useItem(args[0]);
   } else if (args.length >= commands.length) {
     exec(commands[commands.length - 1][command], args);
-  } else if (room.exits && getExit(command, room.exits)) {
-    // handle shorthand direction command, e.g. "EAST" instead of "GO EAST"
-    goDir(command);
   } else if (disk.conversation && (disk.conversation[command] || conversationIncludesTopic(disk.conversation, command))) {
     talkToOrAboutX('about', command);
   } else {
